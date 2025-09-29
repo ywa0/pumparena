@@ -20,7 +20,10 @@
             font-family: 'Orbitron', monospace;
             display: flex;
             justify-content: center;
-            align-items: center;
+            /* --- FIX: Changed align-items to flex-start to prevent content from being pushed off-screen --- */
+            align-items: flex-start; 
+            padding-top: 20px;
+            padding-bottom: 20px;
             min-height: 100vh;
             color: white;
             position: relative;
@@ -1844,7 +1847,7 @@
     
     <script>
         // --- EASY ADJUSTMENT ---
-        const ADJUSTABLE_CANVAS_HEIGHT = 600; // <--- CHANGE THIS VALUE TO RESIZE THE GAME AREA
+        const ADJUSTABLE_CANVAS_HEIGHT = 700; // <--- CHANGE THIS VALUE TO RESIZE THE GAME AREA
 
         // Game variables
         const canvas = document.getElementById('gameCanvas');
