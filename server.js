@@ -38,7 +38,7 @@ let gameState = {
     topPlayers: []
 };
 
-// Create a separate namespace for admin connections
+// --- FIX: Create a separate namespace for admin connections ---
 const adminNamespace = io.of('/admin');
 
 // --- Core Game Loop (runs every second) ---
