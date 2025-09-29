@@ -1780,6 +1780,114 @@
         let playerInterpolationData = {}; // Store interpolation data for other players
         let playerAttackAnimations = {}; // Store attack animations for other players
         
+        // ======================= MINIMAP CODE START =======================
+        const MINIMAP_SIZE = 150;    // width/height in pixels
+        const MINIMAP_MARGIN = 20;   // distance from canvas edges
+        const MINIMAP_DOT = 5;       // player dot size
+        const MINIMAP_ME_COLOR = '#4ade80'; // Use theme's bright green for self
+        const MINIMAP_OTHER_COLOR = '#ef4444'; // Use a contrasting red for others
+        const MINIMAP_BG = 'rgba(0, 40, 10, 0.4)'; // Dark, transparent green background
+        const MINIMAP_BORDER = 'rgba(34, 197, 94, 0.6)'; // Theme's green border
+        const MINIMAP_POINTER = 'rgba(74, 222, 128, 0.7)'; // Lighter green for pointer
+
+        /**
+         * Converts world coordinates to minimap screen coordinates.
+         * @param {number} xWorld - The x-coordinate in the game world.
+         * @param {number} yWorld - The y-coordinate in the game world.
+         * @returns {{x: number, y: number}} The coordinates on the minimap.
+         */
+        function worldToMini(xWorld, yWorld) {
+            const scaleX = MINIMAP_SIZE / WORLD_WIDTH;
+            const scaleY = MINIMAP_SIZE / WORLD_HEIGHT;
+            const x0 = canvas.width - MINIMAP_SIZE - MINIMAP_MARGIN;
+            const y0 = MINIMAP_MARGIN;
+            return {
+                x: x0 + xWorld * scaleX,
+                y: y0 + yWorld * scaleY
+            };
+        }
+
+        /**
+         * Finds the nearest living opponent to the current player.
+         * @param {string} myId - The socket ID of the current player.
+         * @param {Object} players - The gameState.players object.
+         * @returns {Object|null} The nearest opponent player object or null if none found.
+         */
+        function getNearestOpponent(myId, players) {
+            const me = players[myId];
+            if (!me) return null;
+
+            let nearest = null;
+            let bestDist2 = Infinity;
+
+            for (const id in players) {
+                if (id === myId) continue;
+                const p = players[id];
+                if (!p || p.health <= 0) continue; // Ignore dead or invalid players
+                
+                const dx = p.x - me.x;
+                const dy = p.y - me.y;
+                const d2 = dx*dx + dy*dy;
+                if (d2 < bestDist2) {
+                    bestDist2 = d2;
+                    nearest = p;
+                }
+            }
+            return nearest;
+        }
+
+        /**
+         * Draws the minimap overlay on the main game canvas.
+         */
+        function drawMiniMap() {
+            if (!canvas || !ctx || !gameState || !gameState.players || !socket) return;
+
+            const x0 = canvas.width - MINIMAP_SIZE - MINIMAP_MARGIN;
+            const y0 = MINIMAP_MARGIN;
+
+            ctx.save(); // Isolate minimap drawing from other rendering
+
+            // Background
+            ctx.fillStyle = MINIMAP_BG;
+            ctx.fillRect(x0, y0, MINIMAP_SIZE, MINIMAP_SIZE);
+            
+            // Border
+            ctx.strokeStyle = MINIMAP_BORDER;
+            ctx.lineWidth = 2;
+            ctx.strokeRect(x0, y0, MINIMAP_SIZE, MINIMAP_SIZE);
+
+            // Plot player dots
+            for (const id in gameState.players) {
+                const p = gameState.players[id];
+                if (p && p.health > 0) { // Only draw living players
+                    const { x, y } = worldToMini(p.x, p.y);
+                    ctx.fillStyle = (id === socket.id) ? MINIMAP_ME_COLOR : MINIMAP_OTHER_COLOR;
+                    ctx.beginPath();
+                    ctx.arc(x, y, MINIMAP_DOT / 2, 0, Math.PI * 2);
+                    ctx.fill();
+                }
+            }
+
+            // Draw pointer to the nearest opponent
+            const nearest = getNearestOpponent(socket.id, gameState.players);
+            const me = gameState.players[socket.id];
+
+            if (nearest && me) {
+                const myPos = worldToMini(me.x, me.y);
+                const enemyPos = worldToMini(nearest.x, nearest.y);
+                
+                ctx.strokeStyle = MINIMAP_POINTER;
+                ctx.lineWidth = 1;
+                ctx.beginPath();
+                ctx.moveTo(myPos.x, myPos.y);
+                ctx.lineTo(enemyPos.x, enemyPos.y);
+                ctx.stroke();
+            }
+            
+            ctx.restore(); // Restore context to previous state
+        }
+        // ======================== MINIMAP CODE END ========================
+        
         // Socket connection
         let socket = null;
         let connectionStatus = 'disconnected';
@@ -2216,6 +2324,9 @@
 
             // Update leaderboard periodically
             updateLeaderboard();
+
+            // Draw the minimap last so it overlays the game view
+            drawMiniMap();
 
             requestAnimationFrame(gameLoop);
         }
