@@ -1,0 +1,427 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PUMP ROYALE - Admin Panel</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&display=swap');
+        
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Orbitron', monospace;
+            background: #0a0a0a;
+            color: #e0e0e0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+        }
+
+        .container {
+            width: 90%;
+            max-width: 600px;
+            background: rgba(0, 0, 0, 0.8);
+            border: 2px solid rgba(0, 255, 107, 0.3);
+            border-radius: 16px;
+            padding: 30px;
+            box-shadow: 0 0 30px rgba(0, 255, 107, 0.1);
+            backdrop-filter: blur(10px);
+        }
+
+        h1 {
+            color: #4ade80;
+            text-align: center;
+            margin-bottom: 20px;
+            text-shadow: 0 0 15px rgba(0, 255, 107, 0.5);
+            text-transform: uppercase;
+            letter-spacing: 2px;
+        }
+
+        .login-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.95);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 100;
+        }
+
+        .login-box {
+            padding: 40px;
+            background: #111;
+            border-radius: 12px;
+            border: 2px solid rgba(0, 255, 107, 0.3);
+            text-align: center;
+        }
+
+        #passwordInput {
+            background: rgba(255, 255, 255, 0.1);
+            border: 2px solid rgba(0, 255, 107, 0.3);
+            border-radius: 8px;
+            padding: 12px;
+            font-size: 16px;
+            font-family: 'Orbitron', monospace;
+            color: white;
+            text-align: center;
+            margin-bottom: 20px;
+            outline: none;
+        }
+
+        #passwordInput:focus {
+            border-color: #4ade80;
+        }
+
+        button, .button {
+            background: linear-gradient(135deg, #16a34a, #4ade80);
+            border: none;
+            padding: 12px 24px;
+            border-radius: 8px;
+            color: white;
+            font-size: 16px;
+            font-weight: 700;
+            font-family: 'Orbitron', monospace;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            box-shadow: 0 4px 12px rgba(34, 197, 94, 0.3);
+        }
+
+        button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 16px rgba(74, 222, 128, 0.5);
+        }
+        
+        button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none;
+            box-shadow: none;
+        }
+
+        .admin-dashboard {
+            display: none; /* Hidden until authenticated */
+        }
+        
+        .status-section, .controls-section {
+            margin-top: 30px;
+            border-top: 1px solid rgba(0, 255, 107, 0.2);
+            padding-top: 20px;
+        }
+        
+        h2 {
+            font-size: 18px;
+            color: #86efac;
+            margin-bottom: 15px;
+            text-transform: uppercase;
+        }
+
+        .status-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+            font-size: 16px;
+        }
+
+        .status-item span:first-child {
+            color: rgba(255, 255, 255, 0.7);
+        }
+        
+        .status-item span:last-child {
+            font-weight: bold;
+            color: #fff;
+        }
+
+        .control-group {
+            margin-bottom: 20px;
+        }
+
+        .control-group label {
+            display: block;
+            margin-bottom: 8px;
+            color: rgba(255, 255, 255, 0.7);
+        }
+
+        .control-group input {
+            width: calc(100% - 130px);
+            background: rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(0, 255, 107, 0.3);
+            border-radius: 8px;
+            padding: 10px;
+            font-size: 14px;
+            font-family: 'Orbitron', monospace;
+            color: white;
+            margin-right: 10px;
+        }
+        
+        #connectionStatus {
+            font-size: 12px;
+            padding: 5px 10px;
+            border-radius: 20px;
+            text-align: center;
+        }
+        
+        #connectionStatus.connected {
+            color: #4ade80;
+            background: rgba(34, 197, 94, 0.2);
+        }
+        
+        #connectionStatus.disconnected {
+            color: #ef4444;
+            background: rgba(239, 68, 68, 0.2);
+        }
+
+    </style>
+</head>
+<body>
+
+    <div class="login-overlay" id="loginOverlay">
+        <div class="login-box">
+            <h1>Admin Login</h1>
+            <input type="password" id="passwordInput" placeholder="Enter Admin Password...">
+            <br>
+            <button id="loginButton">Login</button>
+        </div>
+    </div>
+
+    <div class="container admin-dashboard" id="adminDashboard">
+        <h1>PUMP ROYALE Admin</h1>
+        <div id="connectionStatus" class="disconnected">Disconnected</div>
+
+        <div class="status-section">
+            <h2>Live Status</h2>
+            <div class="status-grid">
+                <div class="status-item">
+                    <span>State:</span>
+                    <span id="gameState">--</span>
+                </div>
+                <div class="status-item">
+                    <span>Players:</span>
+                    <span id="playerCount">--</span>
+                </div>
+                <div class="status-item">
+                    <span>Time Left:</span>
+                    <span id="timeLeft">--</span>
+                </div>
+                <div class="status-item">
+                    <span>Round:</span>
+                    <span id="roundNumber">--</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="controls-section">
+            <h2>Round Control</h2>
+            <div class="control-group" style="display: flex; gap: 10px;">
+                <button id="startRoundBtn">Force Start Round</button>
+                <button id="endRoundBtn">Force End Round</button>
+            </div>
+            <div class="control-group">
+                <label for="roundTimeInput">Set Next Round Time (seconds)</label>
+                <input type="number" id="roundTimeInput" placeholder="e.g., 300 for 5 mins" value="300">
+                <button id="setTimeBtn">Set Time</button>
+            </div>
+             <div class="control-group">
+                <label for="roundNumberInput">Set Round Number</label>
+                <input type="number" id="roundNumberInput" placeholder="e.g., 1" value="1">
+                <button id="setRoundBtn">Set Round</button>
+            </div>
+        </div>
+        
+        <div class="controls-section">
+            <h2>Broadcast</h2>
+            <div class="control-group">
+                <label for="broadcastInput">Send Message to All Players</label>
+                <input type="text" id="broadcastInput" placeholder="Message...">
+                <button id="broadcastBtn">Send</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.7.2/socket.io.js"></script>
+    <script>
+        // --- CONFIGURATION ---
+        const SERVER_URL = 'http://pumproyale.net'; // IMPORTANT: Use your actual server URL
+        const ADMIN_PASSWORD = 'pumpitup'; // IMPORTANT: Change this to a secure password!
+
+        // --- DOM ELEMENTS ---
+        const loginOverlay = document.getElementById('loginOverlay');
+        const passwordInput = document.getElementById('passwordInput');
+        const loginButton = document.getElementById('loginButton');
+        const adminDashboard = document.getElementById('adminDashboard');
+        const allButtons = document.querySelectorAll('button');
+
+        const connStatusEl = document.getElementById('connectionStatus');
+        const gameStateEl = document.getElementById('gameState');
+        const playerCountEl = document.getElementById('playerCount');
+        const timeLeftEl = document.getElementById('timeLeft');
+        const roundNumberEl = document.getElementById('roundNumber');
+
+        const startRoundBtn = document.getElementById('startRoundBtn');
+        const endRoundBtn = document.getElementById('endRoundBtn');
+        const setTimeBtn = document.getElementById('setTimeBtn');
+        const roundTimeInput = document.getElementById('roundTimeInput');
+        const setRoundBtn = document.getElementById('setRoundBtn');
+        const roundNumberInput = document.getElementById('roundNumberInput');
+        const broadcastBtn = document.getElementById('broadcastBtn');
+        const broadcastInput = document.getElementById('broadcastInput');
+
+        let socket = null;
+
+        // --- INITIALIZATION ---
+        function init() {
+            loginButton.addEventListener('click', handleLogin);
+            passwordInput.addEventListener('keypress', (e) => {
+                if (e.key === 'Enter') handleLogin();
+            });
+
+            // Disable controls until authenticated
+            disableAllControls();
+        }
+
+        // --- LOGIN & AUTHENTICATION ---
+        function handleLogin() {
+            const password = passwordInput.value;
+            if (!password) {
+                alert('Please enter a password.');
+                return;
+            }
+            
+            // For this simple panel, we'll just use the password to connect.
+            // The server will do the actual validation.
+            connectToServer(password);
+        }
+
+        function connectToServer(password) {
+            if (socket) socket.disconnect();
+            
+            updateConnectionStatus('connecting', 'Connecting...');
+
+            socket = io(SERVER_URL, {
+                transports: ['websocket'],
+                // Send password in auth payload
+                auth: { token: password }
+            });
+
+            // --- SOCKET EVENT LISTENERS ---
+            socket.on('connect', () => {
+                console.log('Connected to server. Awaiting authentication...');
+            });
+            
+            socket.on('disconnect', () => {
+                updateConnectionStatus('disconnected', 'Disconnected');
+                disableAllControls();
+            });
+
+            socket.on('admin:auth_success', () => {
+                console.log('Authentication successful!');
+                updateConnectionStatus('connected', 'Connected & Authenticated');
+                loginOverlay.style.display = 'none';
+                adminDashboard.style.display = 'block';
+                enableAllControls();
+            });
+
+            socket.on('admin:auth_fail', () => {
+                console.error('Authentication failed!');
+                alert('Authentication failed. Incorrect password or server error.');
+                socket.disconnect();
+            });
+            
+            socket.on('gameStateUpdate', (data) => {
+                updateStatus(data);
+            });
+        }
+        
+        // --- UI & STATE MANAGEMENT ---
+        function updateConnectionStatus(state, text) {
+            connStatusEl.textContent = text;
+            connStatusEl.className = state;
+        }
+        
+        function updateStatus(data) {
+            gameStateEl.textContent = data.state || '--';
+            playerCountEl.textContent = data.playerCount || '0';
+            roundNumberEl.textContent = data.roundNumber || '--';
+            timeLeftEl.textContent = formatTime(data.timeRemaining);
+        }
+        
+        function formatTime(seconds) {
+            if (typeof seconds !== 'number' || seconds < 0) return '00:00';
+            const mins = Math.floor(seconds / 60).toString().padStart(2, '0');
+            const secs = (seconds % 60).toString().padStart(2, '0');
+            return `${mins}:${secs}`;
+        }
+        
+        function disableAllControls() {
+            allButtons.forEach(btn => {
+                if (btn.id !== 'loginButton') {
+                    btn.disabled = true;
+                }
+            });
+        }
+        
+        function enableAllControls() {
+            allButtons.forEach(btn => {
+                btn.disabled = false;
+            });
+        }
+
+        // --- CONTROL EVENT EMITTERS ---
+        startRoundBtn.addEventListener('click', () => {
+            if (confirm('Are you sure you want to FORCE START the round?')) {
+                socket.emit('admin:startRound');
+            }
+        });
+        
+        endRoundBtn.addEventListener('click', () => {
+             if (confirm('Are you sure you want to FORCE END the round?')) {
+                socket.emit('admin:endRound');
+            }
+        });
+        
+        setTimeBtn.addEventListener('click', () => {
+            const time = parseInt(roundTimeInput.value, 10);
+            if (isNaN(time) || time <= 0) {
+                alert('Please enter a valid positive number for time.');
+                return;
+            }
+            socket.emit('admin:setTime', time);
+            alert(`Next round duration set to ${time} seconds.`);
+        });
+
+        setRoundBtn.addEventListener('click', () => {
+            const round = parseInt(roundNumberInput.value, 10);
+            if (isNaN(round) || round <= 0) {
+                alert('Please enter a valid positive number for the round.');
+                return;
+            }
+            socket.emit('admin:setRound', round);
+            alert(`Round number set to ${round}.`);
+        });
+        
+        broadcastBtn.addEventListener('click', () => {
+            const message = broadcastInput.value.trim();
+            if (!message) {
+                alert('Please enter a message to broadcast.');
+                return;
+            }
+            socket.emit('admin:broadcast', message);
+            broadcastInput.value = '';
+            alert('Message broadcasted!');
+        });
+
+        // Start the script
+        init();
+    </script>
+</body>
+</html>

@@ -1,4 +1,4 @@
-// server.js - FINAL VERSION
+// server.js - FINAL VERSION with ROUND SYSTEM
 
 const express = require('express');
 const http = require('http');
@@ -7,7 +7,6 @@ const path = require('path');
 
 const app = express();
 const server = http.createServer(app);
-
 const io = socketIo(server, {
     cors: {
         origin: "*",
@@ -16,11 +15,10 @@ const io = socketIo(server, {
 });
 
 const PORT = 3000;
+app.use(express.static(__dirname));
 
-// This correctly serves files from the main project directory
-app.use(express.static(path.join(__dirname))); 
-// If your server.js is in the root, change the line above to:
-// app.use(express.static(__dirname));
+// --- CONFIGURATION ---
+const ADMIN_PASSWORD = 'pumpitup'; // IMPORTANT: Must match admin.html
 
 // --- Game Constants ---
 const WORLD_WIDTH = 1200 * 4;
@@ -28,29 +26,151 @@ const WORLD_HEIGHT = 900 * 4;
 const PLAYER_MAX_HEALTH = 100;
 const ATTACK_RANGE = 150;
 const ATTACK_DAMAGE = 20;
+const DEFAULT_ROUND_DURATION = 300; // 5 minutes
+const INTERMISSION_DURATION = 10; // 10 seconds
 
+// --- Game State Management ---
 let players = {};
+let adminSockets = new Set();
 
-// --- Main Game Logic ---
+let gameState = {
+    state: 'WAITING', // WAITING, INTERMISSION, IN_PROGRESS
+    roundNumber: 1,
+    roundTimeRemaining: DEFAULT_ROUND_DURATION,
+    intermissionTimeRemaining: INTERMISSION_DURATION,
+    nextRoundDuration: DEFAULT_ROUND_DURATION,
+    topPlayers: []
+};
+
+// --- Core Game Loop (runs every second) ---
+setInterval(() => {
+    switch (gameState.state) {
+        case 'IN_PROGRESS':
+            gameState.roundTimeRemaining--;
+            if (gameState.roundTimeRemaining <= 0) {
+                endRound();
+            }
+            break;
+        case 'INTERMISSION':
+            gameState.intermissionTimeRemaining--;
+            if (gameState.intermissionTimeRemaining <= 0) {
+                startRound();
+            }
+            break;
+    }
+
+    // Broadcast the state to all players and admins
+    const slimGameState = {
+        state: gameState.state,
+        timeRemaining: gameState.state === 'IN_PROGRESS' ? gameState.roundTimeRemaining : gameState.intermissionTimeRemaining,
+        roundNumber: gameState.roundNumber,
+        playerCount: Object.keys(players).length
+    };
+    
+    io.emit('gameStateUpdate', slimGameState);
+}, 1000);
+
+// --- Round Management Functions ---
+
+function startRound() {
+    console.log(`Starting Round #${gameState.roundNumber}`);
+    gameState.state = 'IN_PROGRESS';
+    gameState.roundTimeRemaining = gameState.nextRoundDuration;
+    gameState.topPlayers = [];
+
+    // Reset all players
+    for (const id in players) {
+        const player = players[id];
+        player.kills = 0;
+        player.health = PLAYER_MAX_HEALTH;
+        player.x = Math.floor(Math.random() * (WORLD_WIDTH - 200)) + 100;
+        player.y = Math.floor(Math.random() * (WORLD_HEIGHT - 200)) + 100;
+    }
+    
+    // Notify clients that the round is starting and send the full reset state
+    io.emit('roundStart', { players });
+    io.emit('playerCountUpdate', Object.keys(players).length);
+}
+
+function endRound() {
+    console.log(`Round #${gameState.roundNumber} has ended.`);
+    gameState.state = 'INTERMISSION';
+    gameState.intermissionTimeRemaining = INTERMISSION_DURATION;
+
+    // Calculate top players
+    const sortedPlayers = Object.values(players)
+        .sort((a, b) => b.kills - a.kills)
+        .slice(0, 3)
+        .map(p => ({ name: p.name, kills: p.kills })); // Send only necessary data
+
+    gameState.topPlayers = sortedPlayers;
+    console.log('Top Players:', sortedPlayers);
+    
+    gameState.roundNumber++;
+
+    // Notify clients that the round is over with the results
+    io.emit('roundOver', { topPlayers: gameState.topPlayers });
+}
+
+// --- Socket Connection Handling ---
 io.on('connection', (socket) => {
-    console.log(`✅ Player connected: ${socket.id}`);
+    console.log(`🔌 Player connected: ${socket.id}`);
 
-    players[socket.id] = { id: socket.id, x: Math.floor(Math.random() * (WORLD_WIDTH - 200)) + 100, y: Math.floor(Math.random() * (WORLD_HEIGHT - 200)) + 100, health: PLAYER_MAX_HEALTH, maxHealth: PLAYER_MAX_HEALTH, direction: 1, weaponAngle: 0, kills: 0, name: 'BONKER' };
+    // --- Admin Authentication ---
+    if (socket.handshake.auth.token === ADMIN_PASSWORD) {
+        console.log(`👑 Admin authenticated: ${socket.id}`);
+        socket.isAdmin = true;
+        adminSockets.add(socket);
+        socket.emit('admin:auth_success');
+        
+        // Send current state to the new admin
+        socket.emit('gameStateUpdate', {
+            state: gameState.state,
+            timeRemaining: gameState.state === 'IN_PROGRESS' ? gameState.roundTimeRemaining : gameState.intermissionTimeRemaining,
+            roundNumber: gameState.roundNumber,
+            playerCount: Object.keys(players).length
+        });
+    } else {
+        socket.isAdmin = false;
+    }
 
+    // Initialize a new player
+    players[socket.id] = { 
+        id: socket.id, 
+        x: Math.floor(Math.random() * (WORLD_WIDTH - 200)) + 100, 
+        y: Math.floor(Math.random() * (WORLD_HEIGHT - 200)) + 100, 
+        health: PLAYER_MAX_HEALTH, 
+        maxHealth: PLAYER_MAX_HEALTH, 
+        direction: 1, 
+        weaponAngle: 0, 
+        kills: 0, 
+        name: 'PUMPER' 
+    };
+
+    // Send initial game state to the new player
+    socket.emit('gameState', { 
+        players: players, 
+        playerCount: Object.keys(players).length,
+        ...gameState 
+    });
+    
+    io.emit('playerCountUpdate', Object.keys(players).length);
+
+    // --- Player Event Handlers ---
     socket.on('setUsername', (username) => {
         const player = players[socket.id];
         if (player) {
             player.name = username.substring(0, 15);
             console.log(`Player ${socket.id} is now known as ${player.name}`);
-            socket.emit('gameState', { players: players, playerCount: Object.keys(players).length });
             socket.broadcast.emit('playerUpdate', player);
-            io.emit('playerCountUpdate', Object.keys(players).length);
         }
     });
 
     socket.on('move', (data) => {
+        // Only allow movement during a round and if alive
+        if (gameState.state !== 'IN_PROGRESS') return; 
         const player = players[socket.id];
-        if (player) {
+        if (player && player.health > 0) {
             player.x = data.x;
             player.y = data.y;
             player.direction = data.direction;
@@ -58,12 +178,60 @@ io.on('connection', (socket) => {
             socket.broadcast.emit('playerUpdate', player);
         }
     });
+    
+    const handleAttack = (attackerId) => {
+        const attacker = players[attackerId];
+        if (!attacker || attacker.health <= 0) return;
 
-    socket.on('areaAttack', (data) => handleAttack(socket.id, data.direction));
-    socket.on('mobileCollisionAttack', (data) => handleAttack(socket.id, data.direction));
-    socket.on('attackAnimation', (data) => socket.broadcast.emit('attackAnimation', data));
+        for (const victimId in players) {
+            if (victimId === attackerId) continue;
+            const victim = players[victimId];
+            if (!victim || victim.health <= 0) continue;
+
+            const dx = victim.x - attacker.x;
+            const dy = victim.y - attacker.y;
+            const distance = Math.sqrt(dx * dx + dy * dy);
+
+            if (distance < ATTACK_RANGE) {
+                // Check if attacker is facing the victim
+                const attackDirection = attacker.direction || 1;
+                const isFacingVictim = (attackDirection === -1 && dx > 0) || (attackDirection === 1 && dx < 0);
+                
+                if (isFacingVictim) {
+                    victim.health -= ATTACK_DAMAGE;
+                    io.emit('playerHit', { playerId: victimId, health: victim.health, x: victim.x, y: victim.y });
+                    
+                    if (victim.health <= 0) {
+                        attacker.kills++;
+                        io.emit('playerKilled', { 
+                            killer: { id: attackerId, name: attacker.name, kills: attacker.kills }, 
+                            victim: { id: victimId, name: victim.name } 
+                        });
+                        io.emit('playerUpdate', attacker); // Update killer's score for everyone
+                    }
+                    break; // Only hit one player per attack
+                }
+            }
+        }
+    }
+
+    socket.on('areaAttack', () => {
+        if (gameState.state !== 'IN_PROGRESS') return;
+        handleAttack(socket.id);
+    });
+
+    socket.on('mobileCollisionAttack', () => {
+        if (gameState.state !== 'IN_PROGRESS') return;
+        handleAttack(socket.id);
+    });
+    
+    socket.on('attackAnimation', (data) => {
+        if (gameState.state !== 'IN_PROGRESS') return;
+        socket.broadcast.emit('attackAnimation', data);
+    });
 
     socket.on('respawn', () => {
+        if (gameState.state !== 'IN_PROGRESS') return; // Can only respawn during a round
         const player = players[socket.id];
         if (player && player.health <= 0) {
             player.health = PLAYER_MAX_HEALTH;
@@ -73,41 +241,65 @@ io.on('connection', (socket) => {
         }
     });
 
+    // --- Admin Event Handlers ---
+    socket.on('admin:startRound', () => {
+        if (!socket.isAdmin) return;
+        console.log(`👑 Admin ${socket.id} is force-starting the round.`);
+        if (gameState.state !== 'IN_PROGRESS') {
+            // Reset intermission timer to avoid auto-starting again
+            gameState.intermissionTimeRemaining = INTERMISSION_DURATION; 
+            startRound();
+        }
+    });
+
+    socket.on('admin:endRound', () => {
+        if (!socket.isAdmin) return;
+        console.log(`👑 Admin ${socket.id} is force-ending the round.`);
+        if (gameState.state === 'IN_PROGRESS') {
+            endRound();
+        }
+    });
+
+    socket.on('admin:setTime', (time) => {
+        if (!socket.isAdmin) return;
+        const newTime = parseInt(time, 10);
+        if (!isNaN(newTime) && newTime > 0) {
+            gameState.nextRoundDuration = newTime;
+            console.log(`👑 Admin ${socket.id} set next round duration to ${newTime}s.`);
+        }
+    });
+    
+    socket.on('admin:setRound', (roundNum) => {
+        if (!socket.isAdmin) return;
+        const newRound = parseInt(roundNum, 10);
+        if (!isNaN(newRound) && newRound > 0) {
+            gameState.roundNumber = newRound;
+            console.log(`👑 Admin ${socket.id} set round number to ${newRound}.`);
+        }
+    });
+    
+    socket.on('admin:broadcast', (message) => {
+        if (!socket.isAdmin) return;
+        const sanitizedMessage = String(message).substring(0, 200); // Basic sanitization
+        console.log(`👑 Admin ${socket.id} broadcasted: "${sanitizedMessage}"`);
+        io.emit('broadcastMessage', sanitizedMessage);
+    });
+
+    // --- Disconnect Handler ---
     socket.on('disconnect', () => {
-        console.log(`❌ Player disconnected: ${socket.id}`);
+        console.log(`👋 Player disconnected: ${socket.id}`);
+        if (socket.isAdmin) {
+            adminSockets.delete(socket);
+            console.log(`👑 Admin disconnected: ${socket.id}`);
+        }
         delete players[socket.id];
         io.emit('playerLeft', socket.id);
         io.emit('playerCountUpdate', Object.keys(players).length);
     });
 });
 
-function handleAttack(attackerId, direction) {
-    const attacker = players[attackerId];
-    if (!attacker || attacker.health <= 0) return;
-    for (const victimId in players) {
-        if (victimId === attackerId) continue;
-        const victim = players[victimId];
-        if (!victim || victim.health <= 0) continue;
-        const dx = victim.x - attacker.x;
-        const dy = victim.y - attacker.y;
-        const distance = Math.sqrt(dx * dx + dy * dy);
-        if (distance < ATTACK_RANGE) {
-            const isFacingVictim = (direction === -1 && dx > 0) || (direction === 1 && dx < 0);
-            if (isFacingVictim) {
-                victim.health -= ATTACK_DAMAGE;
-                io.emit('playerHit', { playerId: victimId, health: victim.health, x: victim.x, y: victim.y });
-                if (victim.health <= 0) {
-                    attacker.kills++;
-                    io.emit('playerKilled', { killer: { id: attackerId, name: attacker.name, kills: attacker.kills }, victim: { id: victimId, name: victim.name } });
-                    io.emit('playerUpdate', attacker);
-                }
-                break;
-            }
-        }
-    }
-}
-
-// This forces the server to listen on all network interfaces
+// --- Server Start ---
 server.listen(PORT, '0.0.0.0', () => {
-    console.log(`🚀 Bonkers game server is live and running on port ${PORT}`);
+    console.log(`🚀 PUMP ROYALE server is live on port ${PORT}`);
+    console.log('🔑 Admin password is:', yumps);
 });
