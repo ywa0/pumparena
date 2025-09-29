@@ -61,7 +61,6 @@
                 inset 0 1px 0 rgba(0, 255, 215, 0.1),
                 inset 0 -1px 0 rgba(0, 255, 107, 0.1);
             max-width: 98vw;
-            max-height: 98vh;
             overflow-y: auto;
             box-sizing: border-box;
         }
@@ -1114,7 +1113,6 @@
 
             #gameCanvas {
                 width: 100% !important;
-                height: 1200px !important;
                 max-width: 100vw;
                 object-fit: contain;
                 /* CHANGED: Orange border to green */
@@ -1667,7 +1665,6 @@
         /* Landscape mobile optimization */
         @media (max-width: 768px) and (orientation: landscape) {
             #gameCanvas {
-                height: 60vh !important;
             }
 
             .player-hud {
@@ -1731,7 +1728,7 @@
             <div class="hud-contract-section">
                 <div class="hud-contract-title">📄 Contract Address</div>
                 <div class="hud-contract-address-container">
-                    <div class="hud-contract-address" id="hudContractAddress">Soon</div>
+                    <div class="hud-contract-address" id="hudContractAddress">BTUBTn7dHhs5FX4dw87GTmCqae7uk8ica8gwkiqhpump</div>
                     <button class="hud-copy-button" id="hudCopyButton" onclick="copyHudContractAddress()">📋 Copy</button>
                 </div>
             </div>
@@ -1830,7 +1827,7 @@
         <div class="contract-section">
             <div class="contract-title">📄 Contract Address</div>
             <div class="contract-address-container">
-                <div class="contract-address" id="contractAddress">Soon</div>
+                <div class="contract-address" id="contractAddress">BTUBTn7dHhs5FX4dw87GTmCqae7uk8ica8gwkiqhpump</div>
                 <button class="copy-button" id="copyButton" onclick="copyContractAddress()">📋 Copy</button>
             </div>
             <div class="copy-feedback" id="copyFeedback">Copied to clipboard!</div>
@@ -1868,7 +1865,7 @@
 
         // World and Camera settings
         const CANVAS_WIDTH = 1200;
-        const CANVAS_HEIGHT = 1200; // Increased from 800 to 900
+        const CANVAS_HEIGHT = 1200;
         const WORLD_WIDTH = CANVAS_WIDTH * 4; // 4800
         const WORLD_HEIGHT = CANVAS_HEIGHT * 4; // 3600
         
