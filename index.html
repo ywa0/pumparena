@@ -23,8 +23,12 @@
             align-items: center;
             min-height: 100vh;
             color: white;
-            overflow: hidden;
             position: relative;
+        }
+
+        /* NEW: Added this class to conditionally disable scrolling during gameplay */
+        body.noscroll {
+            overflow: hidden;
         }
 
         body::before {
@@ -1839,6 +1843,9 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.7.2/socket.io.js"></script>
     
     <script>
+        // --- EASY ADJUSTMENT ---
+        const ADJUSTABLE_CANVAS_HEIGHT = 1200; // <--- CHANGE THIS VALUE TO RESIZE THE GAME AREA
+
         // Game variables
         const canvas = document.getElementById('gameCanvas');
         const ctx = canvas.getContext('2d', { alpha: false });
@@ -1865,9 +1872,9 @@
 
         // World and Camera settings
         const CANVAS_WIDTH = 1200;
-        const CANVAS_HEIGHT = 1200;
+        const CANVAS_HEIGHT = ADJUSTABLE_CANVAS_HEIGHT;
         const WORLD_WIDTH = CANVAS_WIDTH * 4; // 4800
-        const WORLD_HEIGHT = CANVAS_HEIGHT * 4; // 3600
+        const WORLD_HEIGHT = CANVAS_HEIGHT * 4;
         
         // Camera follows local player; keeps them centered in the visible canvas
         let camera = { x: 0, y: 0 };
@@ -2116,6 +2123,7 @@
             playerUsername = username;
             usernameSubmitted = true;
             hideUsernameModal();
+            document.body.classList.add('noscroll'); // Lock scrolling when game starts
             
             // Now connect to server with username
             console.log('Username submitted:', playerUsername);
@@ -2669,11 +2677,13 @@
                 hideRespawnScreen();
                 updateHUD();
             }
+            document.body.classList.add('noscroll'); // Re-lock scrolling on respawn
         }
         
         function showRespawnScreen(killerName) {
             document.getElementById('killerName').textContent = killerName;
             document.getElementById('respawnOverlay').style.display = 'flex';
+            document.body.classList.remove('noscroll'); // Unlock scrolling when dead
         }
         
         function hideRespawnScreen() {
@@ -2895,6 +2905,7 @@
             const overlay = document.getElementById('roundOverOverlay');
             const winnersContainer = document.getElementById('winnersContainer');
             overlay.style.display = 'flex';
+            document.body.classList.remove('noscroll'); // Unlock scrolling when round is over
             
             winnersContainer.innerHTML = ''; // Clear previous winners
 
@@ -2923,6 +2934,7 @@
         function hideRoundOverScreen() {
             const overlay = document.getElementById('roundOverOverlay');
             overlay.style.display = 'none';
+            document.body.classList.add('noscroll'); // Re-lock scrolling on new round
         }
 
         function showBroadcast(message) {
@@ -3266,6 +3278,7 @@
         // Start the game when the page loads
         window.addEventListener('load', () => {
             console.log('🚀 Page loaded, showing username modal...');
+            canvas.height = ADJUSTABLE_CANVAS_HEIGHT; // Dynamically set canvas height
             showUsernameModal();
             
             // Initialize mobile optimizations
