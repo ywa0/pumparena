@@ -2156,7 +2156,7 @@
             const deltaTime = Math.min(timestamp - lastFrameTime, 50);
             lastFrameTime = timestamp;
 
-            // Handle movement
+            // Handle movement (This part is correct, leave it as is)
             let dx = 0;
             let dy = 0;
 
@@ -2170,71 +2170,54 @@
                 }
                 if (isKeyPressed('left')) {
                     dx -= 1;
-                    // Update player direction
-                    if (gameState.myPlayer) {
-                        gameState.myPlayer.direction = 1; // Facing left
+                if (gameState.myPlayer) {
+                        gameState.myPlayer.direction = 1;
                     }
                 }
                 if (isKeyPressed('right')) {
                     dx += 1;
-                    // Update player direction
-                    if (gameState.myPlayer) {
-                        gameState.myPlayer.direction = -1; // Facing right
+                   if (gameState.myPlayer) {
+                        gameState.myPlayer.direction = -1;
                     }
                 }
             } else {
                 // Mobile: Use touch controls
                 dx = mobileTouch.movement.x;
                 dy = mobileTouch.movement.y;
-                
-                // Update player direction based on movement
-                if (gameState.myPlayer && Math.abs(dx) > 0.1) {
-                    gameState.myPlayer.direction = dx > 0 ? -1 : 1; // Right: -1, Left: 1
+             if (gameState.myPlayer && Math.abs(dx) > 0.1) {
+                    gameState.myPlayer.direction = dx > 0 ? -1 : 1;
                 }
             }
 
-            // If there's movement input
-            if (dx !== 0 || dy !== 0) {
-                // Normalize diagonal movement
+            // Apply movement (This part is correct, leave it as is)
+        if (dx !== 0 || dy !== 0) {
                 if (dx !== 0 && dy !== 0) {
                     const normalizer = 1 / Math.sqrt(2);
                     dx *= normalizer;
                     dy *= normalizer;
-                }
-
-                // Apply speed and delta time
+            }
                 const moveSpeed = PLAYER_SPEED * (deltaTime / 16);
                 dx *= moveSpeed;
                 dy *= moveSpeed;
-
-                // Calculate new position using world boundaries
-                const newX = Math.max(PLAYER_SIZE/2, Math.min(WORLD_WIDTH - PLAYER_SIZE/2, gameState.myPlayer.x + dx));
-                const newY = Math.max(PLAYER_SIZE/2, Math.min(WORLD_HEIGHT - PLAYER_SIZE/2, gameState.myPlayer.y + dy));
-
-                // Update local position immediately for smooth movement
+            const newX = Math.max(PLAYER_SIZE/2, Math.min(WORLD_WIDTH - PLAYER_SIZE/2, gameState.myPlayer.x + dx));
+            const newY = Math.max(PLAYER_SIZE/2, Math.min(WORLD_HEIGHT - PLAYER_SIZE/2, gameState.myPlayer.y + dy));
                 gameState.myPlayer.x = newX;
                 gameState.myPlayer.y = newY;
-                
-                // IMPORTANT: Also update the position in the players collection
-                if (gameState.players[gameState.myId]) {
+            if (gameState.players[gameState.myId]) {
                     gameState.players[gameState.myId].x = newX;
                     gameState.players[gameState.myId].y = newY;
                     gameState.players[gameState.myId].direction = gameState.myPlayer.direction;
-                }
-
-                // Only send update to server if enough time has passed
+            }
                 const now = Date.now();
                 const timeSinceLastUpdate = now - lastMovementUpdate;
                 const distanceMoved = Math.sqrt(
                     Math.pow(newX - lastSentPosition.x, 2) + 
                     Math.pow(newY - lastSentPosition.y, 2)
-                );
-
+            );
                 if (timeSinceLastUpdate >= MOVEMENT_UPDATE_RATE && distanceMoved >= MIN_MOVEMENT_DISTANCE) {
                     if (socket && socket.connected) {
                         const weaponAngle = Math.atan2(mouse.y - gameState.myPlayer.y, mouse.x - gameState.myPlayer.x);
-                        
-                        socket.emit('move', {
+                     socket.emit('move', {
                             x: newX,
                             y: newY,
                             direction: gameState.myPlayer.direction,
@@ -2246,12 +2229,14 @@
                 }
             }
 
-            // === CAMERA & FRAME SETUP ===
-            ctx.setTransform(1, 0, 0, 1, 0, 0); // Reset any previous transforms
+            // === [START] MODIFIED RENDER & CAMERA LOGIC ===
+
+            // Reset transform and clear the canvas
+            ctx.setTransform(1, 0, 0, 1, 0, 0); 
             ctx.fillStyle = '#0a0a0a';
             ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-            // If we know our player, position the camera so player appears at canvas center
+            // Position the camera so the player is always in the center of the canvas
             if (gameState && gameState.myPlayer) {
               camera.x = gameState.myPlayer.x - (canvas.width  / 2);
               camera.y = gameState.myPlayer.y - (canvas.height / 2);
@@ -2260,10 +2245,13 @@
               camera.y = 0;
             }
 
-            // Shift world so that the player is visually centered in the canvas
+            // Apply the camera translation to the world
             ctx.translate(-camera.x, -camera.y);
 
-            // === WORLD DRAWING ===
+            // === [END] MODIFIED RENDER & CAMERA LOGIC ===
+
+
+            // === WORLD DRAWING (This part is correct, leave it as is) ===
             drawGrid();
             
             // Update interpolated positions for other players
@@ -2283,7 +2271,6 @@
                         player.x = interpData.startX + (interpData.targetX - interpData.startX) * easeOutCubic;
                         player.y = interpData.startY + (interpData.targetY - interpData.startY) * easeOutCubic;
                     } else {
-                        // Interpolation complete, snap to target
                         player.x = interpData.targetX;
                         player.y = interpData.targetY;
                         delete playerInterpolationData[playerId];
@@ -2292,33 +2279,23 @@
             }
             
             // Draw all players
-            let myPlayerDrawn = false;
             for (const playerId in gameState.players) {
                 const player = gameState.players[playerId];
                 if (player && player.health > 0) {
                     drawPlayer(player);
-                    if (playerId === gameState.myId) {
-                        myPlayerDrawn = true;
-                    }
                 }
             }
             
-            // Ensure myPlayer is always drawn (fallback)
-            if (!myPlayerDrawn && gameState.myPlayer && gameState.myPlayer.health > 0) {
-                drawPlayer(gameState.myPlayer);
-            }
-
             drawHitEffects();
             
-            // Screen-space overlay on canvas (crosshair, minimap, etc.)
+            // === SCREEN-SPACE UI DRAWING ===
+            // Reset transform again so UI elements are fixed to the screen
             ctx.setTransform(1, 0, 0, 1, 0, 0);
             
             drawCrosshair();
-
-            // Update leaderboard periodically
+            
             updateLeaderboard();
 
-            // Draw the minimap last so it overlays the game view
             drawMiniMap();
 
             requestAnimationFrame(gameLoop);
