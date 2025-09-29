@@ -301,5 +301,5 @@ io.on('connection', (socket) => {
 // --- Server Start ---
 server.listen(PORT, '0.0.0.0', () => {
     console.log(`🚀 PUMP ROYALE server is live on port ${PORT}`);
-    console.log('🔑 Admin password is:', yumps);
+    console.log('🔑 Admin password is:', ADMIN_PASSWORD);
 });

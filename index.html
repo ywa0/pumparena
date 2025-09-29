@@ -876,6 +876,149 @@
             /* CHANGED: Orange text to green */
             color: #22c55e;
         }
+        
+        /* --- START: NEW CSS FOR ROUND SYSTEM --- */
+        .round-timer-bar {
+            width: 100%;
+            max-width: 1200px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 10px 20px;
+            background: rgba(0, 0, 0, 0.7);
+            border-radius: 12px;
+            border: 1px solid rgba(0, 255, 107, 0.2);
+            margin-bottom: 20px;
+            backdrop-filter: blur(5px);
+        }
+
+        #roundStatus {
+            font-size: 16px;
+            font-weight: 700;
+            color: #86efac;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        #roundTimer {
+            font-size: 20px;
+            font-weight: 900;
+            color: #fff;
+            background: rgba(0, 255, 107, 0.1);
+            padding: 5px 10px;
+            border-radius: 8px;
+        }
+
+        #roundOverOverlay {
+            position: fixed;
+            top: 0; left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 10, 0, 0.9);
+            backdrop-filter: blur(15px);
+            z-index: 500;
+            display: none; /* Hidden by default */
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            gap: 20px;
+            color: white;
+        }
+
+        .round-over-title {
+            font-size: 64px;
+            font-weight: 900;
+            color: #4ade80;
+            text-shadow: 0 0 30px rgba(0, 255, 107, 0.8);
+            text-transform: uppercase;
+            letter-spacing: 4px;
+        }
+
+        #winnersContainer {
+            display: flex;
+            align-items: flex-end;
+            gap: 20px;
+        }
+
+        .winner-card {
+            background: rgba(0, 0, 0, 0.7);
+            border: 2px solid rgba(0, 255, 107, 0.3);
+            border-radius: 16px;
+            padding: 20px;
+            text-align: center;
+            width: 250px;
+            transition: all 0.3s ease;
+        }
+
+        .winner-card .rank {
+            font-size: 48px;
+            font-weight: 900;
+            margin-bottom: 10px;
+        }
+
+        .winner-card .name {
+            font-size: 24px;
+            font-weight: 700;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        
+        .winner-card .kills {
+            font-size: 18px;
+            color: rgba(255, 255, 255, 0.7);
+        }
+
+        .winner-card.first {
+            order: 2;
+            width: 300px;
+            padding: 30px;
+            border-color: #86efac;
+            box-shadow: 0 0 30px rgba(74, 222, 128, 0.5);
+            transform: scale(1.1);
+        }
+
+        .winner-card.second {
+            order: 1;
+        }
+
+        .winner-card.third {
+            order: 3;
+        }
+
+        .winner-card.first .rank { color: #86efac; }
+        .winner-card.second .rank { color: #4ade80; }
+        .winner-card.third .rank { color: #22c55e; }
+
+        #intermissionTimer {
+            margin-top: 20px;
+            font-size: 20px;
+            color: rgba(255, 255, 255, 0.8);
+        }
+
+        #broadcastMessage {
+            position: fixed;
+            top: -100px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 80%;
+            max-width: 800px;
+            padding: 15px 20px;
+            background: linear-gradient(135deg, #16a34a, #4ade80);
+            color: white;
+            text-align: center;
+            font-size: 18px;
+            font-weight: 700;
+            border-radius: 0 0 12px 12px;
+            box-shadow: 0 5px 20px rgba(0, 255, 107, 0.3);
+            z-index: 1000;
+            transition: top 0.5s ease-in-out;
+        }
+
+        #broadcastMessage.show {
+            top: 0;
+        }
+        /* --- END: NEW CSS FOR ROUND SYSTEM --- */
 
         /* Mobile Responsiveness */
                     @media (max-width: 768px) {
@@ -1502,6 +1645,23 @@
                 height: 70px;
                 font-size: 24px;
             }
+
+            /* --- START: RESPONSIVE CSS FOR ROUND SYSTEM --- */
+            .round-over-title {
+                font-size: 32px;
+            }
+            #winnersContainer {
+                flex-direction: column;
+                align-items: center;
+                gap: 10px;
+            }
+            .winner-card, .winner-card.first {
+                width: 80vw;
+                padding: 15px;
+                order: 0 !important; /* Reset order for column layout */
+                transform: none !important; /* Reset scale for column layout */
+            }
+             /* --- END: RESPONSIVE CSS FOR ROUND SYSTEM --- */
         }
 
         /* Landscape mobile optimization */
@@ -1523,6 +1683,12 @@
     </style>
 </head>
 <body>
+    <div id="roundOverOverlay">
+        <h1 class="round-over-title">Round Over!</h1>
+        <div id="winnersContainer"></div>
+        <p id="intermissionTimer">Next round starting soon...</p>
+    </div>
+    <div id="broadcastMessage"></div>
     <div class="game-interface">
         <div class="game-header">
             <h1 class="game-title">💊 PUMP ROYALE</h1>
@@ -1531,10 +1697,14 @@
                 <div class="connection-badge players-count" id="playersCount">0 Players</div>
             </div>
         </div>
+        <div class="round-timer-bar">
+            <span id="roundStatus">Waiting for game to start...</span>
+            <span id="roundTimer">00:00</span>
+        </div>
         
         <!-- Leaderboard moved to top -->
         <div class="leaderboard" id="leaderboard">
-            <div class="leaderboard-title">🏆 TOP PUMPS</div>
+            <div class="leaderboard-title">🏆 TOP PUMPS (CURRENT ROUND)</div>
             <div class="leaderboard-list" id="leaderboardList">
                 <div class="leaderboard-item">
                     <div class="leaderboard-rank">-</div>
@@ -1561,7 +1731,7 @@
             <div class="hud-contract-section">
                 <div class="hud-contract-title">📄 Contract Address</div>
                 <div class="hud-contract-address-container">
-                    <div class="hud-contract-address" id="hudContractAddress">FEJDX6LgqddNwbPrJBy4pwyjFa5V36Gexp67Nm3Spump</div>
+                    <div class="hud-contract-address" id="hudContractAddress">BTUBTn7dHhs5FX4dw87GTmCqae7uk8ica8gwkiqhpump</div>
                     <button class="hud-copy-button" id="hudCopyButton" onclick="copyHudContractAddress()">📋 Copy</button>
                 </div>
             </div>
@@ -1660,7 +1830,7 @@
         <div class="contract-section">
             <div class="contract-title">📄 Contract Address</div>
             <div class="contract-address-container">
-                <div class="contract-address" id="contractAddress">FEJDX6LgqddNwbPrJBy4pwyjFa5V36Gexp67Nm3Spump</div>
+                <div class="contract-address" id="contractAddress">BTUBTn7dHhs5FX4dw87GTmCqae7uk8ica8gwkiqhpump</div>
                 <button class="copy-button" id="copyButton" onclick="copyContractAddress()">📋 Copy</button>
             </div>
             <div class="copy-feedback" id="copyFeedback">Copied to clipboard!</div>
@@ -1702,14 +1872,8 @@
         const WORLD_WIDTH = CANVAS_WIDTH * 4; // 4800
         const WORLD_HEIGHT = CANVAS_HEIGHT * 4; // 3600
         
-        // Camera system
-        let camera = {
-            x: 0,
-            y: 0,
-            targetX: 0,
-            targetY: 0,
-            smoothing: 0.1
-        };
+        // Camera follows local player; keeps them centered in the visible canvas
+        let camera = { x: 0, y: 0 };
         
         // Create simple sprite substitutes (colored rectangles)
         const characterSprite = (() => {
@@ -1906,6 +2070,13 @@
             myPlayer: null,
             playerCount: 0,
             lastUpdateTime: 0
+        };
+
+        // --- NEW: Client-side round state ---
+        let clientGameState = {
+            state: 'WAITING', // WAITING, INTERMISSION, IN_PROGRESS
+            timeRemaining: 0,
+            roundNumber: 0
         };
         
         // Player stats
@@ -2146,6 +2317,38 @@
                     }
                 });
 
+                // --- NEW SOCKET LISTENERS FOR ROUND SYSTEM ---
+                socket.on('gameStateUpdate', (data) => {
+                    clientGameState.state = data.state;
+                    clientGameState.timeRemaining = data.timeRemaining;
+                    clientGameState.roundNumber = data.roundNumber;
+                    updateTimerUI();
+                });
+
+                socket.on('roundStart', (data) => {
+                    console.log("--- ROUND START ---");
+                    gameState.players = data.players;
+                    gameState.myPlayer = gameState.players[socket.id];
+                    // Reset local stats
+                    stats = { kills: 0, deaths: 0, kdr: 0.00 };
+
+                    hideRoundOverScreen();
+                    hideRespawnScreen(); // Hide respawn screen if it was open
+                    
+                    updateStats();
+                    updateHUD();
+                    updateLeaderboard();
+                });
+                
+                socket.on('roundOver', (data) => {
+                    console.log("--- ROUND OVER ---");
+                    showRoundOverScreen(data.topPlayers);
+                });
+
+                socket.on('broadcastMessage', (message) => {
+                    showBroadcast(message);
+                });
+
             } catch (error) {
                 console.error('Connection failed:', error);
                 updateConnectionStatus('disconnected');
@@ -2163,114 +2366,104 @@
             lastFrameTime = timestamp;
 
             // Handle movement
-            let dx = 0;
-            let dy = 0;
+            if (clientGameState.state === 'IN_PROGRESS' && gameState.myPlayer.health > 0) {
+                let dx = 0;
+                let dy = 0;
 
-            // Desktop: Check movement keys
-            if (!isMobile) {
-                if (isKeyPressed('up')) {
-                    dy -= 1;
-                }
-                if (isKeyPressed('down')) {
-                    dy += 1;
-                }
-                if (isKeyPressed('left')) {
-                    dx -= 1;
-                    // Update player direction
-                    if (gameState.myPlayer) {
-                        gameState.myPlayer.direction = 1; // Facing left
+                // Desktop: Check movement keys
+                if (!isMobile) {
+                    if (isKeyPressed('up')) {
+                        dy -= 1;
                     }
-                }
-                if (isKeyPressed('right')) {
-                    dx += 1;
-                    // Update player direction
-                    if (gameState.myPlayer) {
-                        gameState.myPlayer.direction = -1; // Facing right
+                    if (isKeyPressed('down')) {
+                        dy += 1;
                     }
-                }
-            } else {
-                // Mobile: Use touch controls
-                dx = mobileTouch.movement.x;
-                dy = mobileTouch.movement.y;
-                
-                // Update player direction based on movement
+                    if (isKeyPressed('left')) {
+                        dx -= 1;
+                    if (gameState.myPlayer) {
+                            gameState.myPlayer.direction = 1;
+                        }
+                    }
+                    if (isKeyPressed('right')) {
+                        dx += 1;
+                    if (gameState.myPlayer) {
+                            gameState.myPlayer.direction = -1;
+                        }
+                    }
+                } else {
+                    // Mobile: Use touch controls
+                    dx = mobileTouch.movement.x;
+                    dy = mobileTouch.movement.y;
                 if (gameState.myPlayer && Math.abs(dx) > 0.1) {
-                    gameState.myPlayer.direction = dx > 0 ? -1 : 1; // Right: -1, Left: 1
-                }
-            }
-
-            // If there's movement input
-            if (dx !== 0 || dy !== 0) {
-                // Normalize diagonal movement
-                if (dx !== 0 && dy !== 0) {
-                    const normalizer = 1 / Math.sqrt(2);
-                    dx *= normalizer;
-                    dy *= normalizer;
+                        gameState.myPlayer.direction = dx > 0 ? -1 : 1;
+                    }
                 }
 
-                // Apply speed and delta time
-                const moveSpeed = PLAYER_SPEED * (deltaTime / 16);
-                dx *= moveSpeed;
-                dy *= moveSpeed;
-
-                // Calculate new position using world boundaries
+                // Apply movement
+                if (dx !== 0 || dy !== 0) {
+                    if (dx !== 0 && dy !== 0) {
+                        const normalizer = 1 / Math.sqrt(2);
+                        dx *= normalizer;
+                        dy *= normalizer;
+                }
+                    const moveSpeed = PLAYER_SPEED * (deltaTime / 16);
+                    dx *= moveSpeed;
+                    dy *= moveSpeed;
                 const newX = Math.max(PLAYER_SIZE/2, Math.min(WORLD_WIDTH - PLAYER_SIZE/2, gameState.myPlayer.x + dx));
                 const newY = Math.max(PLAYER_SIZE/2, Math.min(WORLD_HEIGHT - PLAYER_SIZE/2, gameState.myPlayer.y + dy));
-
-                // Update local position immediately for smooth movement
-                gameState.myPlayer.x = newX;
-                gameState.myPlayer.y = newY;
-                
-                // IMPORTANT: Also update the position in the players collection
+                    gameState.myPlayer.x = newX;
+                    gameState.myPlayer.y = newY;
                 if (gameState.players[gameState.myId]) {
-                    gameState.players[gameState.myId].x = newX;
-                    gameState.players[gameState.myId].y = newY;
-                    gameState.players[gameState.myId].direction = gameState.myPlayer.direction;
+                        gameState.players[gameState.myId].x = newX;
+                        gameState.players[gameState.myId].y = newY;
+                        gameState.players[gameState.myId].direction = gameState.myPlayer.direction;
                 }
-
-                // Only send update to server if enough time has passed
-                const now = Date.now();
-                const timeSinceLastUpdate = now - lastMovementUpdate;
-                const distanceMoved = Math.sqrt(
-                    Math.pow(newX - lastSentPosition.x, 2) + 
-                    Math.pow(newY - lastSentPosition.y, 2)
+                    const now = Date.now();
+                    const timeSinceLastUpdate = now - lastMovementUpdate;
+                    const distanceMoved = Math.sqrt(
+                        Math.pow(newX - lastSentPosition.x, 2) + 
+                        Math.pow(newY - lastSentPosition.y, 2)
                 );
-
-                if (timeSinceLastUpdate >= MOVEMENT_UPDATE_RATE && distanceMoved >= MIN_MOVEMENT_DISTANCE) {
-                    if (socket && socket.connected) {
-                        const weaponAngle = Math.atan2(mouse.y - gameState.myPlayer.y, mouse.x - gameState.myPlayer.x);
-                        
+                    if (timeSinceLastUpdate >= MOVEMENT_UPDATE_RATE && distanceMoved >= MIN_MOVEMENT_DISTANCE) {
+                        if (socket && socket.connected) {
+                            const weaponAngle = Math.atan2(mouse.y - gameState.myPlayer.y, mouse.x - gameState.myPlayer.x);
                         socket.emit('move', {
-                            x: newX,
-                            y: newY,
-                            direction: gameState.myPlayer.direction,
-                            weaponAngle: weaponAngle
-                        });
-                        lastMovementUpdate = now;
-                        lastSentPosition = { x: newX, y: newY };
+                                x: newX,
+                                y: newY,
+                                direction: gameState.myPlayer.direction,
+                                weaponAngle: weaponAngle
+                            });
+                            lastMovementUpdate = now;
+                            lastSentPosition = { x: newX, y: newY };
+                        }
                     }
                 }
             }
 
-            // Update camera to follow player
-            if (gameState.myPlayer) {
-                camera.targetX = gameState.myPlayer.x - CANVAS_WIDTH / 2;
-                camera.targetY = gameState.myPlayer.y - CANVAS_HEIGHT / 2;
-                
-                camera.x += (camera.targetX - camera.x) * camera.smoothing;
-                camera.y += (camera.targetY - camera.y) * camera.smoothing;
-                
-                camera.x = Math.max(0, Math.min(WORLD_WIDTH - CANVAS_WIDTH, camera.x));
-                camera.y = Math.max(0, Math.min(WORLD_HEIGHT - CANVAS_HEIGHT, camera.y));
-            }
 
-            // Clear and render with camera translation
-            ctx.save();
+            // === [START] MODIFIED RENDER & CAMERA LOGIC ===
+
+            // Reset transform and clear the canvas
+            ctx.setTransform(1, 0, 0, 1, 0, 0); 
             ctx.fillStyle = '#0a0a0a';
             ctx.fillRect(0, 0, canvas.width, canvas.height);
-            
+
+            // Position the camera so the player is always in the center of the canvas
+            if (gameState && gameState.myPlayer) {
+              camera.x = gameState.myPlayer.x - (canvas.width  / 2);
+              camera.y = gameState.myPlayer.y - (canvas.height / 2);
+            } else {
+              camera.x = 0;
+              camera.y = 0;
+            }
+
+            // Apply the camera translation to the world
             ctx.translate(-camera.x, -camera.y);
 
+            // === [END] MODIFIED RENDER & CAMERA LOGIC ===
+
+
+            // === WORLD DRAWING (This part is correct, leave it as is) ===
             drawGrid();
             
             // Update interpolated positions for other players
@@ -2290,7 +2483,6 @@
                         player.x = interpData.startX + (interpData.targetX - interpData.startX) * easeOutCubic;
                         player.y = interpData.startY + (interpData.targetY - interpData.startY) * easeOutCubic;
                     } else {
-                        // Interpolation complete, snap to target
                         player.x = interpData.targetX;
                         player.y = interpData.targetY;
                         delete playerInterpolationData[playerId];
@@ -2299,33 +2491,23 @@
             }
             
             // Draw all players
-            let myPlayerDrawn = false;
             for (const playerId in gameState.players) {
                 const player = gameState.players[playerId];
                 if (player && player.health > 0) {
                     drawPlayer(player);
-                    if (playerId === gameState.myId) {
-                        myPlayerDrawn = true;
-                    }
                 }
             }
             
-            // Ensure myPlayer is always drawn (fallback)
-            if (!myPlayerDrawn && gameState.myPlayer && gameState.myPlayer.health > 0) {
-                drawPlayer(gameState.myPlayer);
-            }
-
             drawHitEffects();
             
-            // Restore camera transformation for UI elements
-            ctx.restore();
+            // === SCREEN-SPACE UI DRAWING ===
+            // Reset transform again so UI elements are fixed to the screen
+            ctx.setTransform(1, 0, 0, 1, 0, 0);
             
             drawCrosshair();
-
-            // Update leaderboard periodically
+            
             updateLeaderboard();
 
-            // Draw the minimap last so it overlays the game view
             drawMiniMap();
 
             requestAnimationFrame(gameLoop);
@@ -2381,7 +2563,7 @@
         
         // Game functions
         function shoot() {
-            if (!gameState.myPlayer || gameState.myPlayer.health <= 0 || !canShoot) return;
+            if (clientGameState.state !== 'IN_PROGRESS' || !gameState.myPlayer || gameState.myPlayer.health <= 0 || !canShoot) return;
             
             canShoot = false;
             setTimeout(() => { canShoot = true; }, ATTACK_COOLDOWN);
@@ -2480,7 +2662,7 @@
         }
         
         function requestRespawn() {
-            if (socket && socket.connected) {
+            if (socket && socket.connected && clientGameState.state === 'IN_PROGRESS') {
                 socket.emit('respawn');
             } else {
                 // Offline mode - respawn locally
@@ -2685,6 +2867,74 @@
                     hitEffects.splice(i, 1);
                 }
             }
+        }
+
+        // --- NEW UI MANAGEMENT FUNCTIONS ---
+        function updateTimerUI() {
+            const timerEl = document.getElementById('roundTimer');
+            const statusEl = document.getElementById('roundStatus');
+
+            const time = clientGameState.timeRemaining;
+            const minutes = Math.floor(time / 60).toString().padStart(2, '0');
+            const seconds = (time % 60).toString().padStart(2, '0');
+            timerEl.textContent = `${minutes}:${seconds}`;
+
+            switch (clientGameState.state) {
+                case 'IN_PROGRESS':
+                    statusEl.textContent = `Round ${clientGameState.roundNumber} in Progress`;
+                    break;
+                case 'INTERMISSION':
+                    statusEl.textContent = `Next Round Starting...`;
+                    break;
+                case 'WAITING':
+                    statusEl.textContent = 'Waiting for game to start...';
+                    break;
+                default:
+                    statusEl.textContent = '---';
+            }
+        }
+
+        function showRoundOverScreen(topPlayers) {
+            const overlay = document.getElementById('roundOverOverlay');
+            const winnersContainer = document.getElementById('winnersContainer');
+            overlay.style.display = 'flex';
+            
+            winnersContainer.innerHTML = ''; // Clear previous winners
+
+            const rankClasses = ['first', 'second', 'third'];
+            const rankIcons = ['🏆', '🥈', '🥉'];
+
+            // Handle cases with fewer than 3 players
+            if (topPlayers.length === 0) {
+                 winnersContainer.innerHTML = '<p>No players finished the round.</p>';
+                 return;
+            }
+
+            topPlayers.forEach((player, index) => {
+                if (index > 2) return; // Only show top 3
+                const card = document.createElement('div');
+                card.className = `winner-card ${rankClasses[index]}`;
+                card.innerHTML = `
+                    <div class="rank">${rankIcons[index]}</div>
+                    <div class="name">${player.name}</div>
+                    <div class="kills">${player.kills} Kills</div>
+                `;
+                winnersContainer.appendChild(card);
+            });
+        }
+
+        function hideRoundOverScreen() {
+            const overlay = document.getElementById('roundOverOverlay');
+            overlay.style.display = 'none';
+        }
+
+        function showBroadcast(message) {
+            const banner = document.getElementById('broadcastMessage');
+            banner.textContent = message;
+            banner.classList.add('show');
+            setTimeout(() => {
+                banner.classList.remove('show');
+            }, 5000); // Message stays for 5 seconds
         }
         
         // Optimized render functions
@@ -3298,7 +3548,6 @@
                         const rank = index + 1;
                         const rankClass = rank === 1 ? 'first' : rank === 2 ? 'second' : rank === 3 ? 'third' : '';
                         const rankIcon = rank === 1 ? '🥇' : rank === 2 ? '🥈' : '🥉';
-                        const healthPercent = Math.round((player.health / player.maxHealth) * 100);
                         const isMyPlayer = player.id === gameState.myId;
                         
                         const itemClassPrefix = listElement.id === 'leaderboardList' ? 'leaderboard' : 'ingame-leaderboard';
@@ -3313,7 +3562,7 @@
                             <div class="${itemClassPrefix}-rank ${rankClass}">${rank > 3 ? rank : rankIcon}</div>
                             <div class="${itemClassPrefix}-player">
                                 <div class="${itemClassPrefix}-name">${player.name}${isMyPlayer ? ' (You)' : ''}</div>
-                                <div class="${itemClassPrefix}-stats">Health: ${healthPercent}%</div>
+                                <div class="${itemClassPrefix}-stats">Kills: ${player.kills || 0}</div>
                             </div>
                             <div class="${itemClassPrefix}-kills">${player.kills}</div>
                         `;
