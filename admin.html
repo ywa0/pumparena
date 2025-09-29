@@ -251,12 +251,8 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.7.2/socket.io.js"></script>
     <script>
         // --- CONFIGURATION ---
-        // FIX 1: Changed URL to point to the local server.
-        // For production, change this back to your live server URL (e.g., 'http://pumproyale.net')
-        const SERVER_URL = 'http://localhost:3000'; 
-        
-        // FIX 2: Removed the confusing and unused password variable.
-        // The server's password ('pumpitup' in server.js) is the only one that matters.
+        // FIX: Point this to your LIVE server address, including the port.
+        const SERVER_URL = 'http://pumproyale.net:3000';
 
         // --- DOM ELEMENTS ---
         const loginOverlay = document.getElementById('loginOverlay');
@@ -301,7 +297,8 @@
                 return;
             }
             
-            // The password from the input box will be sent to the server for validation.
+            // For this simple panel, we'll just use the password to connect.
+            // The server will do the actual validation.
             connectToServer(password);
         }
 
@@ -312,7 +309,7 @@
 
             socket = io(SERVER_URL, {
                 transports: ['websocket'],
-                // Send password from the input field in the auth payload
+                // Send password in auth payload
                 auth: { token: password }
             });
 
