@@ -43,44 +43,6 @@
             letter-spacing: 2px;
         }
 
-        .login-overlay {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: rgba(0, 0, 0, 0.95);
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            z-index: 100;
-        }
-
-        .login-box {
-            padding: 40px;
-            background: #111;
-            border-radius: 12px;
-            border: 2px solid rgba(0, 255, 107, 0.3);
-            text-align: center;
-        }
-
-        #passwordInput {
-            background: rgba(255, 255, 255, 0.1);
-            border: 2px solid rgba(0, 255, 107, 0.3);
-            border-radius: 8px;
-            padding: 12px;
-            font-size: 16px;
-            font-family: 'Orbitron', monospace;
-            color: white;
-            text-align: center;
-            margin-bottom: 20px;
-            outline: none;
-        }
-
-        #passwordInput:focus {
-            border-color: #4ade80;
-        }
-
         button, .button {
             background: linear-gradient(135deg, #16a34a, #4ade80);
             border: none;
@@ -107,10 +69,6 @@
             cursor: not-allowed;
             transform: none;
             box-shadow: none;
-        }
-
-        .admin-dashboard {
-            display: none; /* Hidden until authenticated */
         }
         
         .status-section, .controls-section {
@@ -184,16 +142,6 @@
     </style>
 </head>
 <body>
-
-    <div class="login-overlay" id="loginOverlay">
-        <div class="login-box">
-            <h1>Admin Login</h1>
-            <input type="password" id="passwordInput" placeholder="Enter Admin Password...">
-            <br>
-            <button id="loginButton">Login</button>
-        </div>
-    </div>
-
     <div class="container admin-dashboard" id="adminDashboard">
         <h1>PUMP ROYALE Admin</h1>
         <div id="connectionStatus" class="disconnected">Disconnected</div>
@@ -251,22 +199,15 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.7.2/socket.io.js"></script>
     <script>
         // --- CONFIGURATION ---
-        // FIX: Point this to your LIVE server address, including the port.
-        const SERVER_URL = 'http://pumproyale.net:3000';
+        const SERVER_URL = 'http://pumproyale.net:3000/admin'; // Connect to the special admin namespace
 
         // --- DOM ELEMENTS ---
-        const loginOverlay = document.getElementById('loginOverlay');
-        const passwordInput = document.getElementById('passwordInput');
-        const loginButton = document.getElementById('loginButton');
-        const adminDashboard = document.getElementById('adminDashboard');
         const allButtons = document.querySelectorAll('button');
-
         const connStatusEl = document.getElementById('connectionStatus');
         const gameStateEl = document.getElementById('gameState');
         const playerCountEl = document.getElementById('playerCount');
         const timeLeftEl = document.getElementById('timeLeft');
         const roundNumberEl = document.getElementById('roundNumber');
-
         const startRoundBtn = document.getElementById('startRoundBtn');
         const endRoundBtn = document.getElementById('endRoundBtn');
         const setTimeBtn = document.getElementById('setTimeBtn');
@@ -278,63 +219,27 @@
 
         let socket = null;
 
-        // --- INITIALIZATION ---
-        function init() {
-            loginButton.addEventListener('click', handleLogin);
-            passwordInput.addEventListener('keypress', (e) => {
-                if (e.key === 'Enter') handleLogin();
-            });
-
-            // Disable controls until authenticated
-            disableAllControls();
-        }
-
-        // --- LOGIN & AUTHENTICATION ---
-        function handleLogin() {
-            const password = passwordInput.value;
-            if (!password) {
-                alert('Please enter a password.');
-                return;
-            }
-            
-            // For this simple panel, we'll just use the password to connect.
-            // The server will do the actual validation.
-            connectToServer(password);
-        }
-
-        function connectToServer(password) {
+        // --- CONNECTION ---
+        function connectToServer() {
             if (socket) socket.disconnect();
             
             updateConnectionStatus('connecting', 'Connecting...');
-
+            
+            // Connect without a password
             socket = io(SERVER_URL, {
-                transports: ['websocket'],
-                // Send password in auth payload
-                auth: { token: password }
+                transports: ['websocket']
             });
 
             // --- SOCKET EVENT LISTENERS ---
             socket.on('connect', () => {
-                console.log('Connected to server. Awaiting authentication...');
+                console.log('Connected to admin namespace!');
+                updateConnectionStatus('connected', 'Connected');
+                enableAllControls();
             });
             
             socket.on('disconnect', () => {
                 updateConnectionStatus('disconnected', 'Disconnected');
                 disableAllControls();
-            });
-
-            socket.on('admin:auth_success', () => {
-                console.log('Authentication successful!');
-                updateConnectionStatus('connected', 'Connected & Authenticated');
-                loginOverlay.style.display = 'none';
-                adminDashboard.style.display = 'block';
-                enableAllControls();
-            });
-
-            socket.on('admin:auth_fail', () => {
-                console.error('Authentication failed!');
-                alert('Authentication failed. Incorrect password or server error.');
-                socket.disconnect();
             });
             
             socket.on('gameStateUpdate', (data) => {
@@ -363,17 +268,11 @@
         }
         
         function disableAllControls() {
-            allButtons.forEach(btn => {
-                if (btn.id !== 'loginButton') {
-                    btn.disabled = true;
-                }
-            });
+            allButtons.forEach(btn => btn.disabled = true);
         }
         
         function enableAllControls() {
-            allButtons.forEach(btn => {
-                btn.disabled = false;
-            });
+            allButtons.forEach(btn => btn.disabled = false);
         }
 
         // --- CONTROL EVENT EMITTERS ---
@@ -420,8 +319,9 @@
             alert('Message broadcasted!');
         });
 
-        // Start the script
-        init();
+        // --- INITIALIZATION ---
+        disableAllControls();
+        connectToServer();
     </script>
 </body>
 </html>

@@ -1,4 +1,4 @@
-// server.js - FINAL VERSION with ROUND SYSTEM
+// server.js - FINAL VERSION with ROUND SYSTEM & NO PASSWORD ADMIN
 
 const express = require('express');
 const http = require('http');
@@ -17,9 +17,6 @@ const io = socketIo(server, {
 const PORT = 3000;
 app.use(express.static(__dirname));
 
-// --- CONFIGURATION ---
-const ADMIN_PASSWORD = 'pumpitup'; // IMPORTANT: Must match admin.html
-
 // --- Game Constants ---
 const WORLD_WIDTH = 1200 * 4;
 const WORLD_HEIGHT = 900 * 4;
@@ -31,7 +28,6 @@ const INTERMISSION_DURATION = 10; // 10 seconds
 
 // --- Game State Management ---
 let players = {};
-let adminSockets = new Set();
 
 let gameState = {
     state: 'WAITING', // WAITING, INTERMISSION, IN_PROGRESS
@@ -41,6 +37,9 @@ let gameState = {
     nextRoundDuration: DEFAULT_ROUND_DURATION,
     topPlayers: []
 };
+
+// Create a separate namespace for admin connections
+const adminNamespace = io.of('/admin');
 
 // --- Core Game Loop (runs every second) ---
 setInterval(() => {
@@ -67,7 +66,9 @@ setInterval(() => {
         playerCount: Object.keys(players).length
     };
     
-    io.emit('gameStateUpdate', slimGameState);
+    io.emit('gameStateUpdate', slimGameState); // To players
+    adminNamespace.emit('gameStateUpdate', slimGameState); // To admins
+
 }, 1000);
 
 // --- Round Management Functions ---
@@ -112,27 +113,65 @@ function endRound() {
     io.emit('roundOver', { topPlayers: gameState.topPlayers });
 }
 
-// --- Socket Connection Handling ---
+// --- ADMIN Connection Handling (No Password) ---
+adminNamespace.on('connection', (socket) => {
+    console.log(`👑 Admin connected: ${socket.id}`);
+
+    // Send current state to the new admin immediately
+    socket.emit('gameStateUpdate', {
+        state: gameState.state,
+        timeRemaining: gameState.state === 'IN_PROGRESS' ? gameState.roundTimeRemaining : gameState.intermissionTimeRemaining,
+        roundNumber: gameState.roundNumber,
+        playerCount: Object.keys(players).length
+    });
+
+    // --- Admin Event Handlers ---
+    socket.on('admin:startRound', () => {
+        console.log(`👑 Admin ${socket.id} is force-starting the round.`);
+        if (gameState.state !== 'IN_PROGRESS') {
+            gameState.intermissionTimeRemaining = INTERMISSION_DURATION; 
+            startRound();
+        }
+    });
+
+    socket.on('admin:endRound', () => {
+        console.log(`👑 Admin ${socket.id} is force-ending the round.`);
+        if (gameState.state === 'IN_PROGRESS') {
+            endRound();
+        }
+    });
+
+    socket.on('admin:setTime', (time) => {
+        const newTime = parseInt(time, 10);
+        if (!isNaN(newTime) && newTime > 0) {
+            gameState.nextRoundDuration = newTime;
+            console.log(`👑 Admin ${socket.id} set next round duration to ${newTime}s.`);
+        }
+    });
+    
+    socket.on('admin:setRound', (roundNum) => {
+        const newRound = parseInt(roundNum, 10);
+        if (!isNaN(newRound) && newRound > 0) {
+            gameState.roundNumber = newRound;
+            console.log(`👑 Admin ${socket.id} set round number to ${newRound}.`);
+        }
+    });
+    
+    socket.on('admin:broadcast', (message) => {
+        const sanitizedMessage = String(message).substring(0, 200);
+        console.log(`👑 Admin ${socket.id} broadcasted: "${sanitizedMessage}"`);
+        io.emit('broadcastMessage', sanitizedMessage);
+    });
+
+    socket.on('disconnect', () => {
+        console.log(`👑 Admin disconnected: ${socket.id}`);
+    });
+});
+
+
+// --- PLAYER Connection Handling ---
 io.on('connection', (socket) => {
     console.log(`🔌 Player connected: ${socket.id}`);
-
-    // --- Admin Authentication ---
-    if (socket.handshake.auth.token === ADMIN_PASSWORD) {
-        console.log(`👑 Admin authenticated: ${socket.id}`);
-        socket.isAdmin = true;
-        adminSockets.add(socket);
-        socket.emit('admin:auth_success');
-        
-        // Send current state to the new admin
-        socket.emit('gameStateUpdate', {
-            state: gameState.state,
-            timeRemaining: gameState.state === 'IN_PROGRESS' ? gameState.roundTimeRemaining : gameState.intermissionTimeRemaining,
-            roundNumber: gameState.roundNumber,
-            playerCount: Object.keys(players).length
-        });
-    } else {
-        socket.isAdmin = false;
-    }
 
     // Initialize a new player
     players[socket.id] = { 
@@ -167,7 +206,6 @@ io.on('connection', (socket) => {
     });
 
     socket.on('move', (data) => {
-        // Only allow movement during a round and if alive
         if (gameState.state !== 'IN_PROGRESS') return; 
         const player = players[socket.id];
         if (player && player.health > 0) {
@@ -193,7 +231,6 @@ io.on('connection', (socket) => {
             const distance = Math.sqrt(dx * dx + dy * dy);
 
             if (distance < ATTACK_RANGE) {
-                // Check if attacker is facing the victim
                 const attackDirection = attacker.direction || 1;
                 const isFacingVictim = (attackDirection === -1 && dx > 0) || (attackDirection === 1 && dx < 0);
                 
@@ -207,9 +244,9 @@ io.on('connection', (socket) => {
                             killer: { id: attackerId, name: attacker.name, kills: attacker.kills }, 
                             victim: { id: victimId, name: victim.name } 
                         });
-                        io.emit('playerUpdate', attacker); // Update killer's score for everyone
+                        io.emit('playerUpdate', attacker);
                     }
-                    break; // Only hit one player per attack
+                    break;
                 }
             }
         }
@@ -231,7 +268,7 @@ io.on('connection', (socket) => {
     });
 
     socket.on('respawn', () => {
-        if (gameState.state !== 'IN_PROGRESS') return; // Can only respawn during a round
+        if (gameState.state !== 'IN_PROGRESS') return;
         const player = players[socket.id];
         if (player && player.health <= 0) {
             player.health = PLAYER_MAX_HEALTH;
@@ -241,57 +278,8 @@ io.on('connection', (socket) => {
         }
     });
 
-    // --- Admin Event Handlers ---
-    socket.on('admin:startRound', () => {
-        if (!socket.isAdmin) return;
-        console.log(`👑 Admin ${socket.id} is force-starting the round.`);
-        if (gameState.state !== 'IN_PROGRESS') {
-            // Reset intermission timer to avoid auto-starting again
-            gameState.intermissionTimeRemaining = INTERMISSION_DURATION; 
-            startRound();
-        }
-    });
-
-    socket.on('admin:endRound', () => {
-        if (!socket.isAdmin) return;
-        console.log(`👑 Admin ${socket.id} is force-ending the round.`);
-        if (gameState.state === 'IN_PROGRESS') {
-            endRound();
-        }
-    });
-
-    socket.on('admin:setTime', (time) => {
-        if (!socket.isAdmin) return;
-        const newTime = parseInt(time, 10);
-        if (!isNaN(newTime) && newTime > 0) {
-            gameState.nextRoundDuration = newTime;
-            console.log(`👑 Admin ${socket.id} set next round duration to ${newTime}s.`);
-        }
-    });
-    
-    socket.on('admin:setRound', (roundNum) => {
-        if (!socket.isAdmin) return;
-        const newRound = parseInt(roundNum, 10);
-        if (!isNaN(newRound) && newRound > 0) {
-            gameState.roundNumber = newRound;
-            console.log(`👑 Admin ${socket.id} set round number to ${newRound}.`);
-        }
-    });
-    
-    socket.on('admin:broadcast', (message) => {
-        if (!socket.isAdmin) return;
-        const sanitizedMessage = String(message).substring(0, 200); // Basic sanitization
-        console.log(`👑 Admin ${socket.id} broadcasted: "${sanitizedMessage}"`);
-        io.emit('broadcastMessage', sanitizedMessage);
-    });
-
-    // --- Disconnect Handler ---
     socket.on('disconnect', () => {
         console.log(`👋 Player disconnected: ${socket.id}`);
-        if (socket.isAdmin) {
-            adminSockets.delete(socket);
-            console.log(`👑 Admin disconnected: ${socket.id}`);
-        }
         delete players[socket.id];
         io.emit('playerLeft', socket.id);
         io.emit('playerCountUpdate', Object.keys(players).length);
@@ -301,5 +289,4 @@ io.on('connection', (socket) => {
 // --- Server Start ---
 server.listen(PORT, '0.0.0.0', () => {
     console.log(`🚀 PUMP ROYALE server is live on port ${PORT}`);
-    console.log('🔑 Admin password is:', ADMIN_PASSWORD);
 });
