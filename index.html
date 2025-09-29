@@ -942,12 +942,12 @@
 
             .game-arena {
                 width: calc(100% - 20px);
-                max-width: 1200px;  /* or whatever width feels best */
+                max-width: 100vw;
                 flex: 0 0 auto;
                 display: flex;
                 flex-direction: column;
                 position: relative;
-                margin: 0 auto;   /* centers horizontally */
+                margin: 5px 10px 5px 10px;
                 box-sizing: border-box;
             }
 
@@ -970,20 +970,17 @@
             }
 
             #gameCanvas {
-    width: 80vw;               /* scale to 80% of browser width */
-    height: 80vh;              /* scale to 80% of browser height */
-    max-width: 1000px;         /* optional: cap max size */
-    max-height: 700px;         /* optional: cap max size */
-    margin: auto;              /* center horizontally */
-    display: block;            /* required for margin:auto centering */
-    object-fit: contain;
-
-    border: 2px solid rgba(34, 197, 94, 0.3);
-    border-radius: 12px;
-    background: rgba(0, 0, 0, 0.9);
-    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
-    box-sizing: border-box;
-}
+                width: 100% !important;
+                height: 50vh !important;
+                max-width: 100vw;
+                object-fit: contain;
+                /* CHANGED: Orange border to green */
+                border: 2px solid rgba(34, 197, 94, 0.3);
+                border-radius: 12px;
+                background: rgba(0, 0, 0, 0.9);
+                box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+                box-sizing: border-box;
+            }
 
             .player-hud {
                 position: static;
@@ -1705,14 +1702,8 @@
         const WORLD_WIDTH = CANVAS_WIDTH * 4; // 4800
         const WORLD_HEIGHT = CANVAS_HEIGHT * 4; // 3600
         
-        // Camera system
-        let camera = {
-            x: 0,
-            y: 0,
-            targetX: 0,
-            targetY: 0,
-            smoothing: 0.1
-        };
+        // Camera follows local player; keeps them centered in the visible canvas
+        let camera = { x: 0, y: 0 };
         
         // Create simple sprite substitutes (colored rectangles)
         const characterSprite = (() => {
@@ -2255,25 +2246,24 @@
                 }
             }
 
-            // Update camera to follow player
-            if (gameState.myPlayer) {
-                camera.targetX = gameState.myPlayer.x - CANVAS_WIDTH / 2;
-                camera.targetY = gameState.myPlayer.y - CANVAS_HEIGHT / 2;
-                
-                camera.x += (camera.targetX - camera.x) * camera.smoothing;
-                camera.y += (camera.targetY - camera.y) * camera.smoothing;
-                
-                camera.x = Math.max(0, Math.min(WORLD_WIDTH - CANVAS_WIDTH, camera.x));
-                camera.y = Math.max(0, Math.min(WORLD_HEIGHT - CANVAS_HEIGHT, camera.y));
-            }
-
-            // Clear and render with camera translation
-            ctx.save();
+            // === CAMERA & FRAME SETUP ===
+            ctx.setTransform(1, 0, 0, 1, 0, 0); // Reset any previous transforms
             ctx.fillStyle = '#0a0a0a';
             ctx.fillRect(0, 0, canvas.width, canvas.height);
-            
+
+            // If we know our player, position the camera so player appears at canvas center
+            if (gameState && gameState.myPlayer) {
+              camera.x = gameState.myPlayer.x - (canvas.width  / 2);
+              camera.y = gameState.myPlayer.y - (canvas.height / 2);
+            } else {
+              camera.x = 0;
+              camera.y = 0;
+            }
+
+            // Shift world so that the player is visually centered in the canvas
             ctx.translate(-camera.x, -camera.y);
 
+            // === WORLD DRAWING ===
             drawGrid();
             
             // Update interpolated positions for other players
@@ -2320,8 +2310,8 @@
 
             drawHitEffects();
             
-            // Restore camera transformation for UI elements
-            ctx.restore();
+            // Screen-space overlay on canvas (crosshair, minimap, etc.)
+            ctx.setTransform(1, 0, 0, 1, 0, 0);
             
             drawCrosshair();
 
